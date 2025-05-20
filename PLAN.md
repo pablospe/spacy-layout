@@ -501,10 +501,10 @@ class spaCyLayout:
 ```
 
 ### Phase 4: Package Structure and Dependencies
-- [ ] **Update package structure** (Complexity: Low)
-  - [ ] Create adapter directory
-  - [ ] Update imports
-  - [ ] Create __init__.py files
+- [x] **Update package structure** (Complexity: Low)
+  - [x] Create adapter directory
+  - [x] Update imports
+  - [x] Create __init__.py files
 
   **Dependencies**: Implementation of adapters completed **Risks**: Breaking
   existing imports or package structure
@@ -522,8 +522,8 @@ spacy_layout/
 └── util.py
 ```
 
-- [ ] **Create adapters/__init__.py** (Complexity: Low)
-  - [ ] Export adapter classes
+- [x] **Create adapters/__init__.py** (Complexity: Low)
+  - [x] Export adapter classes
 
   **Dependencies**: Adapter implementation **Risks**: Minimal
 
@@ -536,9 +536,9 @@ from .azure_adapter import AzureAdapter
 __all__ = ["BackendAdapter", "DoclingAdapter", "AzureAdapter"]
 ```
 
-- [ ] **Update dependencies** (Complexity: Low)
-  - [ ] Add Azure dependencies to requirements.txt
-  - [ ] Update setup.py with optional dependencies
+- [x] **Update dependencies** (Complexity: Low)
+  - [x] Add Azure dependencies to requirements.txt
+  - [x] Update setup.py with optional dependencies
 
   **Dependencies**: None **Risks**:
   - Dependency conflicts

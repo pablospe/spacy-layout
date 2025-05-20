@@ -2,7 +2,10 @@
 
 ## 1. Project Overview
 
-This project aims to extend spaCy-Layout to support Azure AI Document Intelligence as an alternative to Docling for PDF/document processing. The implementation will maintain the existing spaCy-Layout API while allowing users to choose between Docling and Azure as the backend processor.
+This project aims to extend spaCy-Layout to support Azure AI Document
+Intelligence as an alternative to Docling for PDF/document processing. The
+implementation will maintain the existing spaCy-Layout API while allowing users
+to choose between Docling and Azure as the backend processor.
 
 The integration will enable users to:
 - Process documents using Azure AI Document Intelligence
@@ -60,10 +63,15 @@ flowchart TD
 
 ### Key Components
 
-1. **spaCyLayout**: Main class that users interact with, responsible for converting document processing results to spaCy Doc objects.
-2. **BackendAdapter**: Abstract interface that defines the contract for document processing backends.
-3. **DoclingAdapter**: Implements BackendAdapter for Docling, mostly wrapping existing functionality.
-4. **AzureAdapter**: Implements BackendAdapter for Azure AI Document Intelligence, mapping Azure's output format to match what spaCyLayout expects.
+1. **spaCyLayout**: Main class that users interact with, responsible for
+   converting document processing results to spaCy Doc objects.
+2. **BackendAdapter**: Abstract interface that defines the contract for document
+   processing backends.
+3. **DoclingAdapter**: Implements BackendAdapter for Docling, mostly wrapping
+   existing functionality.
+4. **AzureAdapter**: Implements BackendAdapter for Azure AI Document
+   Intelligence, mapping Azure's output format to match what spaCyLayout
+   expects.
 
 ## 3. Implementation Steps
 
@@ -73,8 +81,8 @@ flowchart TD
   - [ ] Define `BackendAdapter` abstract base class
   - [ ] Document interface methods and requirements
 
-  **Dependencies**: None
-  **Risks**: Ensuring the interface is flexible enough for different backends
+  **Dependencies**: None **Risks**: Ensuring the interface is flexible enough
+  for different backends
 
 ```python
 # spacy_layout/adapters/base.py
@@ -121,8 +129,8 @@ class BackendAdapter(ABC):
   - [ ] Ensure compatibility with interface
   - [ ] Handle different source types
 
-  **Dependencies**: BackendAdapter interface
-  **Risks**: Minimal, mostly wrapping existing functionality
+  **Dependencies**: BackendAdapter interface **Risks**: Minimal, mostly wrapping
+  existing functionality
 
 ```python
 # spacy_layout/adapters/docling_adapter.py
@@ -173,8 +181,7 @@ class DoclingAdapter(BackendAdapter):
   - [ ] Handle table data extraction
   - [ ] Support batch processing
 
-  **Dependencies**: BackendAdapter interface, Azure API access
-  **Risks**:
+  **Dependencies**: BackendAdapter interface, Azure API access **Risks**:
   - Azure API changes or versioning issues
   - Converting between different structure formats
   - Handling of complex document layouts
@@ -377,8 +384,7 @@ class AzureAdapter(BackendAdapter):
   - [ ] Ensure backward compatibility
   - [ ] Test with both backends
 
-  **Dependencies**: Both adapters implemented
-  **Risks**:
+  **Dependencies**: Both adapters implemented **Risks**:
   - Breaking changes to existing API
   - Ensuring consistent behavior across backends
   - Handling edge cases in document processing
@@ -485,8 +491,8 @@ class spaCyLayout:
   - [ ] Update imports
   - [ ] Create __init__.py files
 
-  **Dependencies**: Implementation of adapters completed
-  **Risks**: Breaking existing imports or package structure
+  **Dependencies**: Implementation of adapters completed **Risks**: Breaking
+  existing imports or package structure
 
 ```
 spacy_layout/
@@ -504,8 +510,7 @@ spacy_layout/
 - [ ] **Create adapters/__init__.py** (Complexity: Low)
   - [ ] Export adapter classes
 
-  **Dependencies**: Adapter implementation
-  **Risks**: Minimal
+  **Dependencies**: Adapter implementation **Risks**: Minimal
 
 ```python
 # spacy_layout/adapters/__init__.py
@@ -520,8 +525,7 @@ __all__ = ["BackendAdapter", "DoclingAdapter", "AzureAdapter"]
   - [ ] Add Azure dependencies to requirements.txt
   - [ ] Update setup.py with optional dependencies
 
-  **Dependencies**: None
-  **Risks**:
+  **Dependencies**: None **Risks**:
   - Dependency conflicts
   - Version compatibility issues
 
@@ -546,7 +550,8 @@ setup(
 
 ### Unit Tests
 
-Create tests for the Azure adapter in `tests/test_azure.py` (or improve/add to existing tests):
+Create tests for the Azure adapter in `tests/test_azure.py` (or improve/add to
+existing tests):
 
 ```python
 import pytest

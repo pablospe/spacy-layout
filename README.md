@@ -19,7 +19,11 @@ This workflow makes it easy to apply powerful **NLP techniques** to your documen
 > ⚠️ This package requires **Python 3.10** or above.
 
 ```bash
+# Install with Docling support (default)
 pip install spacy-layout
+
+# Install with Azure AI Document Intelligence support
+pip install "spacy-layout[azure]"
 ```
 
 After initializing the `spaCyLayout` preprocessor with an `nlp` object for tokenization, you can call it on a document path to convert it to structured data. The resulting `Doc` object includes layout spans that map into the original raw text and expose various attributes, including the content type and layout features.
@@ -74,6 +78,56 @@ layout = spaCyLayout(nlp)
 doc = layout("./starcraft.pdf")
 # Apply the pipeline to access POS tags, dependencies, entities etc.
 doc = nlp(doc)
+```
+
+### Using Azure AI Document Intelligence
+
+spaCy Layout supports using Azure AI Document Intelligence as an alternative backend for document processing. This allows you to leverage Azure's document analysis capabilities while still using spaCy's familiar API.
+
+```python
+import os
+import spacy
+from spacy_layout import spaCyLayout
+
+# Set Azure credentials in environment variables
+os.environ["AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"] = "your-endpoint"
+os.environ["AZURE_DOCUMENT_INTELLIGENCE_KEY"] = "your-key"
+
+# Or use a .env file (recommended)
+# Create a .env file with your credentials:
+# AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your-endpoint
+# AZURE_DOCUMENT_INTELLIGENCE_KEY=your-key
+
+# Initialize with Azure backend
+nlp = spacy.blank("en")
+layout = spaCyLayout(nlp, backend="azure")
+
+# Or specify a custom .env file path:
+layout = spaCyLayout(
+    nlp,
+    backend="azure",
+    backend_options={
+        "dotenv_path": "/path/to/your/.env"
+    }
+)
+
+# Or pass credentials directly:
+layout = spaCyLayout(
+    nlp,
+    backend="azure",
+    backend_options={
+        "endpoint": "https://your-resource.cognitiveservices.azure.com/",
+        "key": "your-api-key"
+    }
+)
+
+# Process documents as usual
+doc = layout("./document.pdf")
+
+# Use the document as before
+print(doc.text)
+print(doc._.layout)
+print(doc._.tables)
 ```
 
 ### Tables and tabular data
@@ -186,7 +240,8 @@ layout = spaCyLayout(nlp)
 | `attrs` | `dict[str, str]` | Override the custom spaCy attributes. Can include `"doc_layout"`, `"doc_pages"`, `"doc_tables"`, `"doc_markdown"`, `"span_layout"`, `"span_data"`, `"span_heading"` and `"span_group"`. |
 | `headings` | `list[str]` | Labels of headings to consider for `Span._.heading` detection. Defaults to `["section_header", "page_header", "title"]`. |
 | `display_table` | `Callable[[pandas.DataFrame], str] \| str` | Function to generate the text-based representation of the table in the `Doc.text` or placeholder text. Defaults to `"TABLE"`. |
-| `docling_options` | `dict[InputFormat, FormatOption]` | [Format options](https://ds4sd.github.io/docling/usage/#advanced-options) passed to Docling's `DocumentConverter`. |
+| `backend` | `str` | The backend to use for document processing. Either `"docling"` or `"azure"`. Defaults to `"docling"`. |
+| `backend_options` | `dict` | Options for the backend processor. For Docling, can include `"format_options"`. For Azure, can include `"endpoint"`, `"key"`, and `"dotenv_path"` for loading credentials from a .env file. |
 | **RETURNS** | `spaCyLayout` | The initialized object. |
 
 #### <kbd>method</kbd> `spaCyLayout.__call__`

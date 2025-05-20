@@ -1,7 +1,6 @@
 import os
-from io import BytesIO
 from pathlib import Path
-from typing import Any, List, Union
+from typing import Any, Union
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential

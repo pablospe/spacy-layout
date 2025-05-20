@@ -2,28 +2,28 @@ from io import BytesIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Iterable,
     Iterator,
     Literal,
     TypeVar,
+    Union,
     cast,
     overload,
 )
 
 import srsly
-from docling.datamodel.base_models import DocumentStream
-from docling.document_converter import DocumentConverter
 from docling_core.types.doc.document import DoclingDocument
 from docling_core.types.doc.labels import DocItemLabel
 from spacy.tokens import Doc, Span, SpanGroup
 
+from .adapters.azure_adapter import AzureAdapter
+from .adapters.docling_adapter import DoclingAdapter
 from .types import Attrs, DocLayout, DoclingItem, PageLayout, SpanLayout
 from .util import decode_df, decode_obj, encode_df, encode_obj, get_bounding_box
 
 if TYPE_CHECKING:
-    from docling.datamodel.base_models import InputFormat
-    from docling.document_converter import FormatOption
     from pandas import DataFrame
     from spacy.language import Language
 
@@ -52,9 +52,10 @@ class spaCyLayout:
             DocItemLabel.TITLE,
         ],
         display_table: Callable[["DataFrame"], str] | str = TABLE_PLACEHOLDER,
-        docling_options: dict["InputFormat", "FormatOption"] | None = None,
+        backend: Literal["docling", "azure"] = "docling",
+        backend_options: dict[str, Any] = None,
     ) -> None:
-        """Initialize the layout parser and Docling converter."""
+        """Initialize the layout parser and backend adapter."""
         self.nlp = nlp
         self.sep = separator
         self.attrs = Attrs(
@@ -69,7 +70,22 @@ class spaCyLayout:
         )
         self.headings = headings
         self.display_table = display_table
-        self.converter = DocumentConverter(format_options=docling_options)
+        
+        # Initialize the backend adapter
+        backend_options = backend_options or {}
+        if backend == "docling":
+            self.adapter = DoclingAdapter(
+                format_options=backend_options.get("format_options")
+            )
+        elif backend == "azure":
+            self.adapter = AzureAdapter(
+                endpoint=backend_options.get("endpoint"),
+                key=backend_options.get("key"),
+                dotenv_path=backend_options.get("dotenv_path"),
+            )
+        else:
+            raise ValueError(f"Unsupported backend: {backend}")
+            
         # Set spaCy extension attributes for custom data
         Doc.set_extension(self.attrs.doc_layout, default=None, force=True)
         Doc.set_extension(self.attrs.doc_pages, getter=self.get_pages, force=True)
@@ -79,12 +95,13 @@ class spaCyLayout:
         Span.set_extension(self.attrs.span_data, default=None, force=True)
         Span.set_extension(self.attrs.span_heading, getter=self.get_heading, force=True)
 
-    def __call__(self, source: str | Path | bytes | DoclingDocument) -> Doc:
+    def __call__(self, source: Union[str, Path, bytes, DoclingDocument]) -> Doc:
         """Call parser on a path to create a spaCy Doc object."""
         if isinstance(source, DoclingDocument):
             result = source
         else:
-            result = self.converter.convert(self._get_source(source)).document
+            # Use the adapter to convert the document
+            result = self.adapter.convert(source)
         return self._result_to_doc(result)
 
     @overload
@@ -112,22 +129,16 @@ class spaCyLayout:
         """Process multiple documents and create spaCy Doc objects."""
         if as_tuples:
             sources = cast(Iterable[tuple[str | Path | bytes, _AnyContext]], sources)
-            data = (self._get_source(source) for source, _ in sources)
-            contexts = (context for _, context in sources)
-            results = self.converter.convert_all(data)
+            data = [source for source, _ in sources]
+            contexts = [context for _, context in sources]
+            results = self.adapter.convert_all(data)
             for result, context in zip(results, contexts):
                 yield (self._result_to_doc(result.document), context)
         else:
             sources = cast(Iterable[str | Path | bytes], sources)
-            data = (self._get_source(source) for source in sources)
-            results = self.converter.convert_all(data)
+            results = self.adapter.convert_all(list(sources))
             for result in results:
                 yield self._result_to_doc(result.document)
-
-    def _get_source(self, source: str | Path | bytes) -> str | Path | DocumentStream:
-        if isinstance(source, (str, Path)):
-            return source
-        return DocumentStream(name="source", stream=BytesIO(source))
 
     def _result_to_doc(self, document: DoclingDocument) -> Doc:
         inputs = []

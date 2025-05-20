@@ -391,12 +391,12 @@ class AzureAdapter(BackendAdapter):
 ```
 
 ### Phase 3: Integration with spaCyLayout
-- [ ] **Modify spaCyLayout class** (Complexity: Medium)
-  - [ ] Add backend selection parameter
-  - [ ] Update initialization to use appropriate adapter
-  - [ ] Modify document processing methods to use adapters
-  - [ ] Ensure backward compatibility
-  - [ ] Test with both backends
+- [x] **Modify spaCyLayout class** (Complexity: Medium)
+  - [x] Add backend selection parameter
+  - [x] Update initialization to use appropriate adapter
+  - [x] Modify document processing methods to use adapters
+  - [x] Ensure backward compatibility
+  - [x] Test with both backends
 
   **Dependencies**: Both adapters implemented **Risks**:
   - Breaking changes to existing API

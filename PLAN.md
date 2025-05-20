@@ -200,20 +200,34 @@ from docling_core.types.doc.base import BoundingBox, CoordOrigin
 from docling_core.types.doc.document import DoclingDocument, PageItem, TableItem, TextItem
 from docling_core.types.doc.labels import DocItemLabel
 
+# Import python-dotenv for environment variable management (optional)
+try:
+    from dotenv import load_dotenv
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
+
 from .base import BackendAdapter
 
 
 class AzureAdapter(BackendAdapter):
     """Adapter for Azure AI Document Intelligence."""
 
-    def __init__(self, endpoint: str = None, key: str = None):
+    def __init__(self, endpoint: str = None, key: str = None, dotenv_path: str = None):
         """
         Initialize the Azure adapter.
 
         Args:
             endpoint: Azure Document Intelligence endpoint
             key: Azure Document Intelligence API key
+            dotenv_path: Path to .env file containing Azure credentials
         """
+        # Load environment variables from .env file if available
+        if DOTENV_AVAILABLE and dotenv_path is not None:
+            load_dotenv(dotenv_path)
+        elif DOTENV_AVAILABLE:
+            load_dotenv()  # Try to load from default locations
+            
         self.endpoint = endpoint or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
         self.key = key or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
 
@@ -221,7 +235,7 @@ class AzureAdapter(BackendAdapter):
             raise ValueError(
                 "Azure Document Intelligence endpoint and key must be provided or "
                 "set as environment variables (AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT, "
-                "AZURE_DOCUMENT_INTELLIGENCE_KEY)"
+                "AZURE_DOCUMENT_INTELLIGENCE_KEY) or in a .env file"
             )
 
         self.client = DocumentAnalysisClient(
@@ -440,6 +454,7 @@ class spaCyLayout:
             self.adapter = AzureAdapter(
                 endpoint=backend_options.get("endpoint"),
                 key=backend_options.get("key"),
+                dotenv_path=backend_options.get("dotenv_path"),
             )
         else:
             raise ValueError(f"Unsupported backend: {backend}")
@@ -531,19 +546,9 @@ __all__ = ["BackendAdapter", "DoclingAdapter", "AzureAdapter"]
 
 ```
 # Add to requirements.txt
-azure-ai-formrecognizer>=3.2.0
-azure-core>=1.24.0
-```
-
-```python
-# Update setup.py
-setup(
-    name="spacy_layout",
-    packages=find_packages(),
-    extras_require={
-        "azure": ["azure-ai-formrecognizer>=3.2.0", "azure-core>=1.24.0"],
-    },
-)
+azure-ai-documentintelligence==1.0.2
+azure-core==1.34.0
+python-dotenv>=1.1.0
 ```
 
 ## 4. Testing
@@ -685,7 +690,7 @@ spaCy Layout supports using Azure AI Document Intelligence as an alternative bac
 
 ```bash
 # Install with Azure support
-pip install "spacy-layout[azure]"
+pip install spacy-layout
 ```
 
 ### Usage
@@ -699,8 +704,25 @@ from spacy_layout import spaCyLayout
 os.environ["AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"] = "your-endpoint"
 os.environ["AZURE_DOCUMENT_INTELLIGENCE_KEY"] = "your-key"
 
-# Or pass them directly
+# Or use a .env file (recommended)
+# Create a .env file with your credentials:
+# AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your-endpoint
+# AZURE_DOCUMENT_INTELLIGENCE_KEY=your-key
+
+# Then in your code, either let it load automatically:
 nlp = spacy.blank("en")
+layout = spaCyLayout(nlp, backend="azure")
+
+# Or specify a custom .env file path:
+layout = spaCyLayout(
+    nlp,
+    backend="azure",
+    backend_options={
+        "dotenv_path": "/path/to/your/.env"
+    }
+)
+
+# Or pass credentials directly:
 layout = spaCyLayout(
     nlp,
     backend="azure",
@@ -744,7 +766,7 @@ layout = spaCyLayout(nlp, backend="docling")  # or backend="azure"
 | `headings` | `list[str]` | Labels of headings to consider for `Span._.heading` detection. Defaults to `["section_header", "page_header", "title"]`. |
 | `display_table` | `Callable[[pandas.DataFrame], str] \| str` | Function to generate the text-based representation of the table in the `Doc.text` or placeholder text. Defaults to `"TABLE"`. |
 | `backend` | `str` | The backend to use for document processing. Either `"docling"` or `"azure"`. Defaults to `"docling"`. |
-| `backend_options` | `dict` | Options for the backend processor. For Azure, can include `"endpoint"` and `"key"`. |
+| `backend_options` | `dict` | Options for the backend processor. For Azure, can include `"endpoint"`, `"key"`, and `"dotenv_path"` for loading credentials from a .env file. |
 | **RETURNS** | `spaCyLayout` | The initialized object. |
 ```
 
@@ -779,9 +801,10 @@ layout = spaCyLayout(nlp, backend="docling")  # or backend="azure"
 
 ### Azure AI Document Intelligence Resources
 - [Azure Document Intelligence Documentation](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/)
-- [Python SDK Documentation](https://learn.microsoft.com/en-us/python/api/azure-ai-formrecognizer/azure.ai.formrecognizer?view=azure-python)
+- [Python SDK Documentation](https://learn.microsoft.com/en-us/python/api/overview/azure/ai-documentintelligence-readme?view=azure-python)
 - [Layout Analysis Model](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/concept-layout)
+- [Python-dotenv Documentation](https://github.com/theskumar/python-dotenv)
 
 ### Example Projects
 - [Prodigy PDF GitHub Repository](https://github.com/explosion/prodigy-pdf)
-- [Azure Document Intelligence Samples](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/formrecognizer/azure-ai-formrecognizer/samples)
+- [Azure Document Intelligence Samples](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/documentintelligence/azure-ai-documentintelligence/samples)

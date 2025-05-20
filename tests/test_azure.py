@@ -35,11 +35,11 @@ def test_spacylayout_with_docling_backend():
     nlp = spacy.blank("en")
     layout = spaCyLayout(nlp, backend="docling")
     doc = layout(PDF_SIMPLE)
-    
+
     # Check that the document was processed
     assert len(doc.text) > 0
     assert len(doc.spans["layout"]) > 0
-    
+
     # Check that layout information is available
     for span in doc.spans["layout"]:
         if span._.layout:
@@ -55,7 +55,7 @@ def test_spacylayout_with_docling_backend_pipe():
     nlp = spacy.blank("en")
     layout = spaCyLayout(nlp, backend="docling")
     docs = list(layout.pipe([PDF_SIMPLE]))
-    
+
     assert len(docs) == 1
     assert len(docs[0].spans["layout"]) > 0
 
@@ -66,9 +66,10 @@ azure_credentials_available = (
     and "AZURE_DOCUMENT_INTELLIGENCE_KEY" in os.environ
 )
 
+
 @pytest.mark.skipif(
     not azure_credentials_available,
-    reason="Azure Document Intelligence credentials not available"
+    reason="Azure Document Intelligence credentials not available",
 )
 def test_azure_adapter():
     """Test the Azure adapter directly."""
@@ -82,7 +83,7 @@ def test_azure_adapter():
 
 @pytest.mark.skipif(
     not azure_credentials_available,
-    reason="Azure Document Intelligence credentials not available"
+    reason="Azure Document Intelligence credentials not available",
 )
 def test_azure_adapter_convert_all():
     """Test batch processing with Azure adapter."""
@@ -95,18 +96,18 @@ def test_azure_adapter_convert_all():
 
 @pytest.mark.skipif(
     not azure_credentials_available,
-    reason="Azure Document Intelligence credentials not available"
+    reason="Azure Document Intelligence credentials not available",
 )
 def test_spacylayout_with_azure_backend():
     """Test spaCyLayout with Azure backend."""
     nlp = spacy.blank("en")
     layout = spaCyLayout(nlp, backend="azure")
     doc = layout(PDF_SIMPLE)
-    
+
     # Check that the document was processed
     assert len(doc.text) > 0
     assert len(doc.spans["layout"]) > 0
-    
+
     # Check that layout information is available
     for span in doc.spans["layout"]:
         if span._.layout:

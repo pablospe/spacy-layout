@@ -70,7 +70,7 @@ class spaCyLayout:
         )
         self.headings = headings
         self.display_table = display_table
-        
+
         # Initialize the backend adapter
         backend_options = backend_options or {}
         if backend == "docling":
@@ -85,7 +85,7 @@ class spaCyLayout:
             )
         else:
             raise ValueError(f"Unsupported backend: {backend}")
-            
+
         # Set spaCy extension attributes for custom data
         Doc.set_extension(self.attrs.doc_layout, default=None, force=True)
         Doc.set_extension(self.attrs.doc_pages, getter=self.get_pages, force=True)

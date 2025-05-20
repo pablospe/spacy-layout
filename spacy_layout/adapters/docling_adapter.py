@@ -21,7 +21,9 @@ class DoclingAdapter(BackendAdapter):
         """
         self.converter = DocumentConverter(format_options=format_options)
 
-    def _get_source(self, source: Union[str, Path, bytes]) -> Union[str, Path, DocumentStream]:
+    def _get_source(
+        self, source: Union[str, Path, bytes]
+    ) -> Union[str, Path, DocumentStream]:
         """Convert source to a format Docling can process."""
         if isinstance(source, (str, Path)):
             return source

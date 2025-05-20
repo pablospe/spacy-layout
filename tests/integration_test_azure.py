@@ -8,6 +8,7 @@ Prerequisites:
 - Set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY
   environment variables or create a .env file with these variables
 """
+
 import os
 import sys
 from pathlib import Path
@@ -16,9 +17,13 @@ import spacy
 from spacy_layout import spaCyLayout
 
 # Check if Azure credentials are set
-if not os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT") or not os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY"):
+if not os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT") or not os.environ.get(
+    "AZURE_DOCUMENT_INTELLIGENCE_KEY"
+):
     print("Warning: Azure Document Intelligence credentials not set.")
-    print("Please set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY")
+    print(
+        "Please set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY"
+    )
     print("or create a .env file with these values.")
 
 # Path to test data
@@ -26,30 +31,35 @@ TEST_DATA_DIR = Path(__file__).parent / "data"
 PDF_SIMPLE = TEST_DATA_DIR / "simple.pdf"
 PDF_TABLE = TEST_DATA_DIR / "table.pdf"
 
+
 def main():
     # Initialize spaCy and layout processor
     print("Initializing spaCy and spaCyLayout with Azure backend...")
     nlp = spacy.blank("en")
     layout = spaCyLayout(nlp, backend="azure")
-    
+
     print(f"\nProcessing {PDF_SIMPLE}...")
     try:
         doc_simple = layout(PDF_SIMPLE)
-        
+
         print("\nDocument structure:")
         print(f"- {len(doc_simple.spans['layout'])} layout spans")
         print(f"- {len(doc_simple._.layout.pages)} pages")
-        
+
         # Print text spans
         print("\nText spans:")
         for i, span in enumerate(doc_simple.spans["layout"]):
             if span._.layout:
                 print(f"- Span {i}: {span.label_}, page {span._.layout.page_no}")
-                print(f"  \"{span.text[:50]}...\"" if len(span.text) > 50 else f"  \"{span.text}\"")
-        
+                print(
+                    f'  "{span.text[:50]}..."'
+                    if len(span.text) > 50
+                    else f'  "{span.text}"'
+                )
+
         print(f"\nProcessing {PDF_TABLE}...")
         doc_table = layout(PDF_TABLE)
-        
+
         # Print tables
         tables = doc_table._.tables
         print(f"\nFound {len(tables)} tables:")
@@ -60,12 +70,13 @@ def main():
             print(f"  Columns: {', '.join(df.columns)}")
             print("  First 2 rows:")
             print(df.head(2))
-            
+
         print("\nIntegration test completed successfully!")
         return 0
     except Exception as e:
         print(f"Error: {e}")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

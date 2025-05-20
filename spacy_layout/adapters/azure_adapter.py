@@ -5,12 +5,18 @@ from typing import Any, Union
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
 from docling_core.types.doc.base import BoundingBox, CoordOrigin
-from docling_core.types.doc.document import DoclingDocument, PageItem, TableItem, TextItem
+from docling_core.types.doc.document import (
+    DoclingDocument,
+    PageItem,
+    TableItem,
+    TextItem,
+)
 from docling_core.types.doc.labels import DocItemLabel
 
 # Import python-dotenv for environment variable management (optional)
 try:
     from dotenv import load_dotenv
+
     DOTENV_AVAILABLE = True
 except ImportError:
     DOTENV_AVAILABLE = False
@@ -35,8 +41,10 @@ class AzureAdapter(BackendAdapter):
             load_dotenv(dotenv_path)
         elif DOTENV_AVAILABLE:
             load_dotenv()  # Try to load from default locations
-            
-        self.endpoint = endpoint or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+
+        self.endpoint = endpoint or os.environ.get(
+            "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+        )
         self.key = key or os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
 
         if not self.endpoint or not self.key:
@@ -78,7 +86,11 @@ class AzureAdapter(BackendAdapter):
 
         # Handle paragraphs and text
         for paragraph in result.paragraphs:
-            page_number = paragraph.bounding_regions[0].page_number if paragraph.bounding_regions else 1
+            page_number = (
+                paragraph.bounding_regions[0].page_number
+                if paragraph.bounding_regions
+                else 1
+            )
 
             # Create bounding box
             bbox = None
@@ -108,7 +120,9 @@ class AzureAdapter(BackendAdapter):
 
         # Handle tables
         for table_idx, table in enumerate(result.tables):
-            page_number = table.bounding_regions[0].page_number if table.bounding_regions else 1
+            page_number = (
+                table.bounding_regions[0].page_number if table.bounding_regions else 1
+            )
 
             # Create bounding box
             bbox = None
@@ -194,5 +208,5 @@ class AzureAdapter(BackendAdapter):
         for source in sources:
             result = self.convert(source)
             # Wrap to match Docling's output format
-            results.append(type('obj', (object,), {'document': result}))
+            results.append(type("obj", (object,), {"document": result}))
         return results

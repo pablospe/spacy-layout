@@ -121,12 +121,14 @@ def test_table_index(nlp):
     assert table.label_ == DocItemLabel.DOCUMENT_INDEX.value
 
     # Check that each document_index table has a dataframe
-    document_index_tables = [span for span in doc._.get(
-        layout.attrs.doc_tables) if span.label_ == DocItemLabel.DOCUMENT_INDEX.value]
+    document_index_tables = [
+        span
+        for span in doc._.get(layout.attrs.doc_tables)
+        if span.label_ == DocItemLabel.DOCUMENT_INDEX.value
+    ]
     for table in document_index_tables:
         assert table._.data is not None, "Table data not available"
-        assert isinstance(
-            table._.data, pd.DataFrame), "Table data is not a DataFrame"
+        assert isinstance(table._.data, pd.DataFrame), "Table data is not a DataFrame"
 
 
 def test_table_placeholder(nlp):

@@ -41,6 +41,7 @@ We'll use an adapter-based architecture that:
     +-----------------------+         +-------------------------+
 ```
 
+Diagram also in mermaid:
 ```mermaid
 flowchart TD
     spaCyLayout["spaCyLayout"]
@@ -66,11 +67,17 @@ flowchart TD
 
 ## 3. Implementation Steps
 
-### Step 1: Define the BackendAdapter Interface
+### Phase 1: Foundation - Adapter Interface
+- [ ] **Create adapter interface** (Complexity: Low)
+  - [ ] Create directory structure for adapters
+  - [ ] Define `BackendAdapter` abstract base class
+  - [ ] Document interface methods and requirements
 
-Create a new file `spacy_layout/adapters/base.py`:
+  **Dependencies**: None
+  **Risks**: Ensuring the interface is flexible enough for different backends
 
 ```python
+# spacy_layout/adapters/base.py
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Union
@@ -108,13 +115,20 @@ class BackendAdapter(ABC):
         pass
 ```
 
-### Step 2: Implement the DoclingAdapter
+### Phase 2: Backend Adapters
+- [ ] **Implement DoclingAdapter** (Complexity: Low)
+  - [ ] Wrap existing Docling functionality
+  - [ ] Ensure compatibility with interface
+  - [ ] Handle different source types
 
-Create a new file `spacy_layout/adapters/docling_adapter.py`:
+  **Dependencies**: BackendAdapter interface
+  **Risks**: Minimal, mostly wrapping existing functionality
 
 ```python
+# spacy_layout/adapters/docling_adapter.py
 from pathlib import Path
 from typing import Any, Union
+from io import BytesIO
 
 from docling.datamodel.base_models import DocumentStream
 from docling.document_converter import DocumentConverter, FormatOption
@@ -151,11 +165,23 @@ class DoclingAdapter(BackendAdapter):
         return self.converter.convert_all(data)
 ```
 
-### Step 3: Implement the AzureAdapter
+- [ ] **Implement AzureAdapter** (Complexity: High)
+  - [ ] Connect to Azure Document Intelligence API
+  - [ ] Process documents with Azure
+  - [ ] Convert Azure output to DoclingDocument format
+  - [ ] Map Azure layout elements to Docling structure
+  - [ ] Handle table data extraction
+  - [ ] Support batch processing
 
-Create a new file `spacy_layout/adapters/azure_adapter.py`:
+  **Dependencies**: BackendAdapter interface, Azure API access
+  **Risks**:
+  - Azure API changes or versioning issues
+  - Converting between different structure formats
+  - Handling of complex document layouts
+  - Table structure differences between backends
 
 ```python
+# spacy_layout/adapters/azure_adapter.py
 import os
 from io import BytesIO
 from pathlib import Path
@@ -343,11 +369,22 @@ class AzureAdapter(BackendAdapter):
         return results
 ```
 
-### Step 4: Modify spaCyLayout to Use Adapters
+### Phase 3: Integration with spaCyLayout
+- [ ] **Modify spaCyLayout class** (Complexity: Medium)
+  - [ ] Add backend selection parameter
+  - [ ] Update initialization to use appropriate adapter
+  - [ ] Modify document processing methods to use adapters
+  - [ ] Ensure backward compatibility
+  - [ ] Test with both backends
 
-Update `spacy_layout/layout.py`:
+  **Dependencies**: Both adapters implemented
+  **Risks**:
+  - Breaking changes to existing API
+  - Ensuring consistent behavior across backends
+  - Handling edge cases in document processing
 
 ```python
+# Update spacy_layout/layout.py
 from typing import Literal, Union
 
 # Add imports
@@ -440,13 +477,16 @@ class spaCyLayout:
             results = self.adapter.convert_all(sources)
             for result in results:
                 yield self._result_to_doc(result.document)
-
-    # The rest of the class remains unchanged...
 ```
 
-### Step 5: Update Package Structure
+### Phase 4: Package Structure and Dependencies
+- [ ] **Update package structure** (Complexity: Low)
+  - [ ] Create adapter directory
+  - [ ] Update imports
+  - [ ] Create __init__.py files
 
-Update the package structure to include the adapters:
+  **Dependencies**: Implementation of adapters completed
+  **Risks**: Breaking existing imports or package structure
 
 ```
 spacy_layout/
@@ -461,9 +501,14 @@ spacy_layout/
 └── util.py
 ```
 
-Create `spacy_layout/adapters/__init__.py`:
+- [ ] **Create adapters/__init__.py** (Complexity: Low)
+  - [ ] Export adapter classes
+
+  **Dependencies**: Adapter implementation
+  **Risks**: Minimal
 
 ```python
+# spacy_layout/adapters/__init__.py
 from .base import BackendAdapter
 from .docling_adapter import DoclingAdapter
 from .azure_adapter import AzureAdapter
@@ -471,19 +516,23 @@ from .azure_adapter import AzureAdapter
 __all__ = ["BackendAdapter", "DoclingAdapter", "AzureAdapter"]
 ```
 
-### Step 6: Add Azure Document Intelligence Dependencies
+- [ ] **Update dependencies** (Complexity: Low)
+  - [ ] Add Azure dependencies to requirements.txt
+  - [ ] Update setup.py with optional dependencies
 
-Update `requirements.txt` and `setup.py` to include Azure dependencies:
+  **Dependencies**: None
+  **Risks**:
+  - Dependency conflicts
+  - Version compatibility issues
 
-Add to `requirements.txt`:
 ```
+# Add to requirements.txt
 azure-ai-formrecognizer>=3.2.0
 azure-core>=1.24.0
 ```
 
-Update `setup.py` with optional dependencies:
-
 ```python
+# Update setup.py
 setup(
     name="spacy_layout",
     packages=find_packages(),
@@ -497,7 +546,7 @@ setup(
 
 ### Unit Tests
 
-Create tests for the Azure adapter in `tests/test_azure.py`:
+Create tests for the Azure adapter in `tests/test_azure.py` (or improve/add to existing tests):
 
 ```python
 import pytest
@@ -546,32 +595,6 @@ def test_spacy_layout_with_azure():
             assert hasattr(span._.layout, "y")
             assert hasattr(span._.layout, "width")
             assert hasattr(span._.layout, "height")
-
-
-def test_azure_vs_docling():
-    """Compare results from Azure and Docling backends."""
-    nlp = spacy.blank("en")
-
-    # Process with Docling
-    docling_layout = spaCyLayout(nlp, backend="docling")
-    docling_doc = docling_layout(PDF_SIMPLE)
-
-    # Process with Azure
-    azure_layout = spaCyLayout(nlp, backend="azure")
-    azure_doc = azure_layout(PDF_SIMPLE)
-
-    # Both should produce documents with spans
-    assert len(docling_doc.spans["layout"]) > 0
-    assert len(azure_doc.spans["layout"]) > 0
-
-    # Both should identify text content
-    docling_text = docling_doc.text
-    azure_text = azure_doc.text
-
-    # Text content should be similar (though not necessarily identical)
-    # We'll just check that they're not empty and have some overlap
-    assert len(docling_text) > 0
-    assert len(azure_text) > 0
 ```
 
 ### Integration Tests

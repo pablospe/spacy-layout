@@ -173,13 +173,13 @@ class DoclingAdapter(BackendAdapter):
         return self.converter.convert_all(data)
 ```
 
-- [ ] **Implement AzureAdapter** (Complexity: High)
-  - [ ] Connect to Azure Document Intelligence API
-  - [ ] Process documents with Azure
-  - [ ] Convert Azure output to DoclingDocument format
-  - [ ] Map Azure layout elements to Docling structure
-  - [ ] Handle table data extraction
-  - [ ] Support batch processing
+- [x] **Implement AzureAdapter** (Complexity: High)
+  - [x] Connect to Azure Document Intelligence API
+  - [x] Process documents with Azure
+  - [x] Convert Azure output to DoclingDocument format
+  - [x] Map Azure layout elements to Docling structure
+  - [x] Handle table data extraction
+  - [x] Support batch processing
 
   **Dependencies**: BackendAdapter interface, Azure API access **Risks**:
   - Azure API changes or versioning issues

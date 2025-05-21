@@ -129,14 +129,14 @@ There are three ways to provide Azure credentials:
    # Create a .env file with:
    # AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your-endpoint
    # AZURE_DOCUMENT_INTELLIGENCE_KEY=your-key
-   
+
    # Then initialize with:
    layout = spaCyLayout(nlp, backend="azure")  # Auto-loads from .env
-   
+
    # Or specify a custom path:
    layout = spaCyLayout(
-       nlp, 
-       backend="azure", 
+       nlp,
+       backend="azure",
        backend_options={"dotenv_path": "/path/to/.env"}
    )
    ```
@@ -169,7 +169,3 @@ There are three ways to provide Azure credentials:
    - Tools to normalize and calibrate results between backends
    - Benchmark suite for comparing accuracy
    - Methods to combine results from multiple backends
-
-4. **Additional Backends**:
-   - Support for other document processing APIs
-   - Pluggable backend architecture for community extensions

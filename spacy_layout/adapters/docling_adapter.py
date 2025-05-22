@@ -1,6 +1,6 @@
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, List, Union
 
 from docling.datamodel.base_models import DocumentStream
 from docling.document_converter import DocumentConverter, FormatOption
@@ -19,6 +19,33 @@ from ..model import (
     TextItem,
 )
 from .base import BackendAdapter
+
+
+def convert_docling_provenance(prov_items) -> List[ItemProvenance]:
+    """
+    Convert Docling provenance items to internal ItemProvenance format.
+
+    Args:
+        prov_items: Docling provenance items
+
+    Returns:
+        List[ItemProvenance]: Converted provenance list
+    """
+    prov = []  # Always initialize as an empty list for pydantic validation
+    if prov_items:
+        for p in prov_items:
+            bbox = None
+            if hasattr(p, "bbox") and p.bbox:
+                bbox = BoundingBox(
+                    l=p.bbox.l,
+                    r=p.bbox.r,
+                    t=p.bbox.t,
+                    b=p.bbox.b,
+                    coord_origin=CoordOrigin.BOTTOMLEFT,
+                )
+            page_no = getattr(p, "page_no", 1)
+            prov.append(ItemProvenance(bbox=bbox, page_no=page_no))
+    return prov
 
 
 class DoclingAdapter(BackendAdapter):
@@ -77,20 +104,7 @@ class DoclingAdapter(BackendAdapter):
                     pass
 
             # Convert provenance if available
-            prov = []  # Always initialize as an empty list for pydantic validation
-            if text_item.prov:
-                for p in text_item.prov:
-                    bbox = None
-                    if hasattr(p, "bbox") and p.bbox:
-                        bbox = BoundingBox(
-                            l=p.bbox.l,
-                            r=p.bbox.r,
-                            t=p.bbox.t,
-                            b=p.bbox.b,
-                            coord_origin=CoordOrigin.BOTTOMLEFT,
-                        )
-                    page_no = getattr(p, "page_no", 1)
-                    prov.append(ItemProvenance(bbox=bbox, page_no=page_no))
+            prov = convert_docling_provenance(text_item.prov)
 
             # Create the text item
             new_text_item = TextItem(
@@ -111,20 +125,7 @@ class DoclingAdapter(BackendAdapter):
                     pass
 
             # Convert provenance if available
-            prov = []  # Always initialize as an empty list for pydantic validation
-            if table_item.prov:
-                for p in table_item.prov:
-                    bbox = None
-                    if hasattr(p, "bbox") and p.bbox:
-                        bbox = BoundingBox(
-                            l=p.bbox.l,
-                            r=p.bbox.r,
-                            t=p.bbox.t,
-                            b=p.bbox.b,
-                            coord_origin=CoordOrigin.BOTTOMLEFT,
-                        )
-                    page_no = getattr(p, "page_no", 1)
-                    prov.append(ItemProvenance(bbox=bbox, page_no=page_no))
+            prov = convert_docling_provenance(table_item.prov)
 
             # Convert table data
             table_data = None

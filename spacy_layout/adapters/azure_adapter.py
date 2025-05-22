@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, List, Union
 
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
@@ -19,6 +19,36 @@ from ..model import (
     TextItem,
 )
 from .base import BackendAdapter
+
+PDF_POINTS_PER_INCH = 72
+
+
+def create_bbox_from_polygon(
+    polygon: List[float],
+    scale_factor: float = PDF_POINTS_PER_INCH,
+) -> BoundingBox:
+    """
+    Create a BoundingBox from an Azure polygon.
+
+    Args:
+        polygon: List of alternating x, y coordinates
+        coord_origin: Coordinate system origin
+        scale_factor: Factor to scale coordinates (e.g., 72 for inches to points)
+
+    Returns:
+        BoundingBox: Converted bounding box
+    """
+    x_values = polygon[::2]
+    y_values = polygon[1::2]
+
+    return BoundingBox(
+        l=min(x_values) * scale_factor,
+        r=max(x_values) * scale_factor,
+        t=min(y_values) * scale_factor,
+        b=max(y_values) * scale_factor,
+        coord_origin=CoordOrigin.TOPLEFT,
+    )
+
 
 # Import python-dotenv for environment variable management (optional)
 try:
@@ -79,7 +109,6 @@ class AzureAdapter(BackendAdapter):
         )
 
         # Process pages
-        PDF_POINTS_PER_INCH = 72
         for page_idx, page in enumerate(result.pages):
             # Create a page item (1-indexed in our model)
             # Convert page dimensions from inches to PDF points
@@ -105,20 +134,7 @@ class AzureAdapter(BackendAdapter):
             bbox = None
             if paragraph.bounding_regions:
                 region = paragraph.bounding_regions[0]
-                # Convert Azure polygon to bounding box
-                x_values = region.polygon[::2]
-                y_values = region.polygon[1::2]
-
-                # Convert from inches to PDF points (1 inch = 72 points).
-                PDF_POINTS_PER_INCH = 72
-
-                bbox = BoundingBox(
-                    l=min(x_values) * PDF_POINTS_PER_INCH,
-                    r=max(x_values) * PDF_POINTS_PER_INCH,
-                    t=min(y_values) * PDF_POINTS_PER_INCH,
-                    b=max(y_values) * PDF_POINTS_PER_INCH,
-                    coord_origin=CoordOrigin.TOPLEFT,
-                )
+                bbox = create_bbox_from_polygon(region.polygon)
 
             # Create text item
             text_item = TextItem(
@@ -152,20 +168,7 @@ class AzureAdapter(BackendAdapter):
             bbox = None
             if table.bounding_regions:
                 region = table.bounding_regions[0]
-                # Convert Azure polygon to bounding box
-                x_values = region.polygon[::2]
-                y_values = region.polygon[1::2]
-
-                # Convert from inches to PDF points (1 inch = 72 points)
-                PDF_POINTS_PER_INCH = 72
-
-                bbox = BoundingBox(
-                    l=min(x_values) * PDF_POINTS_PER_INCH,
-                    r=max(x_values) * PDF_POINTS_PER_INCH,
-                    t=min(y_values) * PDF_POINTS_PER_INCH,
-                    b=max(y_values) * PDF_POINTS_PER_INCH,
-                    coord_origin=CoordOrigin.TOPLEFT,
-                )
+                bbox = create_bbox_from_polygon(region.polygon)
 
             # Collect table data
             rows = table.row_count

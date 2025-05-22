@@ -1,13 +1,10 @@
 import dataclasses
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
-from docling_core.types.doc.base import CoordOrigin
 from pandas import DataFrame
 
+from .model import BoundingBox, CoordOrigin
 from .types import DocLayout, PageLayout, SpanLayout
-
-if TYPE_CHECKING:
-    from docling_core.types.doc.base import BoundingBox
 
 TYPE_ATTR = "__type__"
 OBJ_TYPES = {"SpanLayout": SpanLayout, "DocLayout": DocLayout, "PageLayout": PageLayout}
@@ -45,7 +42,7 @@ def decode_df(obj: Any, chain: Callable | None = None) -> Any:
 
 
 def get_bounding_box(
-    bbox: "BoundingBox", page_height: float
+    bbox: BoundingBox, page_height: float
 ) -> tuple[float, float, float, float]:
     is_bottom = bbox.coord_origin == CoordOrigin.BOTTOMLEFT
     y = page_height - bbox.t if is_bottom else bbox.t

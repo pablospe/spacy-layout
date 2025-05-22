@@ -1,13 +1,9 @@
 from dataclasses import dataclass
 
-from docling_core.types.doc.document import (
-    ListItem,
-    SectionHeaderItem,
-    TableItem,
-    TextItem,
-)
+from .model import BaseItem
 
-DoclingItem = ListItem | SectionHeaderItem | TextItem | TableItem
+# Use our internal model's BaseItem for document items
+DoclingItem = BaseItem
 
 
 @dataclass

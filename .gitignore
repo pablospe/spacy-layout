@@ -130,3 +130,7 @@ exports
 trash
 
 .DS_Store
+
+tests/data
+tests/output*
+tests/cache*

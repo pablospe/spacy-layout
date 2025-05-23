@@ -8,7 +8,7 @@ import spacy
 from matplotlib.patches import Rectangle
 from spacy.tokens import DocBin
 
-from spacy_layout import spaCyLayout
+from spacy_layout import spaCyLayoutAzure
 
 # Define paths
 TEST_DATA_DIR = Path(__file__).parent / "data"
@@ -31,12 +31,12 @@ def process_with_caching(layout, document_path):
     """Process a document with caching support"""
     cache_path = get_cache_path(document_path)
 
-    # # Check if cache exists
-    # if cache_path.exists():
-    #     print(f"Loading cached document: {document_path.name}")
-    #     doc_bin = DocBin(store_user_data=True).from_disk(cache_path)
-    #     docs = list(doc_bin.get_docs(layout.nlp.vocab))
-    #     return docs[0]  # Return the first (and only) doc
+    # Check if cache exists
+    if cache_path.exists():
+        print(f"Loading cached document: {document_path.name}")
+        doc_bin = DocBin(store_user_data=True).from_disk(cache_path)
+        docs = list(doc_bin.get_docs(layout.nlp.vocab))
+        return docs[0]  # Return the first (and only) doc
 
     # Process document
     print(f"Processing document (first time): {document_path.name}")
@@ -151,15 +151,13 @@ def main():
     """Visualize bounding boxes from PDF extraction"""
     # Initialize spaCy and layout processor
     nlp = spacy.blank("en")
-    # layout = spaCyLayout(nlp, backend="azure")
-    layout = spaCyLayout(nlp, backend="docling")
+    layout = spaCyLayoutAzure(nlp)
 
     # Choose a PDF file to visualize
     pdf_paths = {
         # "simple": TEST_DATA_DIR / "simple.pdf",
         # "table": TEST_DATA_DIR / "table.pdf",
-        # "starcraft": TEST_DATA_DIR / "starcraft.pdf",
-        "2410.09871v2": TEST_DATA_DIR / "2410.09871v2.pdf",
+        "starcraft": TEST_DATA_DIR / "starcraft.pdf",
     }
 
     # Create output directory for visualizations

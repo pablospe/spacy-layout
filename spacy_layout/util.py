@@ -3,7 +3,6 @@ from typing import Any, Callable
 
 from pandas import DataFrame
 
-from .model import BoundingBox, CoordOrigin
 from .types import DocLayout, PageLayout, SpanLayout
 
 TYPE_ATTR = "__type__"
@@ -39,13 +38,3 @@ def decode_df(obj: Any, chain: Callable | None = None) -> Any:
     if isinstance(obj, dict) and obj.get(TYPE_ATTR) == "DataFrame":
         return DataFrame(obj["data"])
     return obj if chain is None else chain(obj)
-
-
-def get_bounding_box(
-    bbox: BoundingBox, page_height: float
-) -> tuple[float, float, float, float]:
-    is_bottom = bbox.coord_origin == CoordOrigin.BOTTOMLEFT
-    y = page_height - bbox.t if is_bottom else bbox.t
-    height = bbox.t - bbox.b if is_bottom else bbox.b - bbox.t
-    width = bbox.r - bbox.l
-    return (bbox.l, y, width, height)

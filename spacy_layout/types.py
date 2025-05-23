@@ -1,10 +1,5 @@
 from dataclasses import dataclass
 
-from .model import BaseItem
-
-# Use our internal model's BaseItem for document items
-DoclingItem = BaseItem
-
 
 @dataclass
 class Attrs:

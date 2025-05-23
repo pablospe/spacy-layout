@@ -1,7 +1,7 @@
 """
 Integration test for Azure backend.
 
-This script demonstrates how to use spaCyLayout with Azure Document Intelligence.
+This script demonstrates how to use spaCyLayoutAzure with Azure Document Intelligence.
 Run this script manually to test the integration.
 
 Prerequisites:
@@ -14,7 +14,8 @@ import sys
 from pathlib import Path
 
 import spacy
-from spacy_layout import spaCyLayout
+
+from spacy_layout import spaCyLayoutAzure
 
 # Check if Azure credentials are set
 if not os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT") or not os.environ.get(
@@ -34,9 +35,9 @@ PDF_TABLE = TEST_DATA_DIR / "table.pdf"
 
 def main():
     # Initialize spaCy and layout processor
-    print("Initializing spaCy and spaCyLayout with Azure backend...")
+    print("Initializing spaCy and spaCyLayoutAzure...")
     nlp = spacy.blank("en")
-    layout = spaCyLayout(nlp, backend="azure")
+    layout = spaCyLayoutAzure(nlp)
 
     print(f"\nProcessing {PDF_SIMPLE}...")
     try:

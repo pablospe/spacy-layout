@@ -1,17 +1,14 @@
 <a href="https://explosion.ai"><img src="https://explosion.ai/assets/img/logo.svg" width="125" height="125" align="right" /></a>
 
-# spaCy Layout: Process PDFs, Word documents and more with spaCy
+# spaCy Layout Azure: Process PDFs and documents with Azure Document Intelligence and spaCy
 
-This plugin integrates with [Docling](https://ds4sd.github.io/docling/) to bring structured processing of **PDFs**, **Word documents** and other input formats to your [spaCy](https://spacy.io) pipeline. It outputs clean, **structured data** in a text-based format and creates spaCy's familiar [`Doc`](https://spacy.io/api/doc) objects that let you access labelled text spans like sections or headings, and tables with their data converted to a `pandas.DataFrame`.
+This plugin integrates [Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence/) with [spaCy](https://spacy.io) to process **PDFs**, **Word documents** and other formats. It outputs clean, **structured data** in a text-based format and creates spaCy's familiar [`Doc`](https://spacy.io/api/doc) objects that let you access labelled text spans like sections or headings, and tables with their data converted to a `pandas.DataFrame`.
 
 This workflow makes it easy to apply powerful **NLP techniques** to your documents, including linguistic analysis, named entity recognition, text classification and more. It's also great for implementing **chunking for RAG** pipelines.
 
-> 📖 **Blog post:** ["From PDFs to AI-ready structured data: a deep dive"
-](https://explosion.ai/blog/pdfs-nlp-structured-data) – A new modular workflow for converting PDFs and similar documents to structured data, featuring `spacy-layout` and Docling.
-
-[![Test](https://github.com/explosion/spacy-layout/actions/workflows/test.yml/badge.svg)](https://github.com/explosion/spacy-layout/actions/workflows/test.yml)
-[![Current Release Version](https://img.shields.io/github/release/explosion/spacy-layout.svg?style=flat-square&logo=github&include_prereleases)](https://github.com/explosion/spacy-layout/releases)
-[![pypi Version](https://img.shields.io/pypi/v/spacy-layout.svg?style=flat-square&logo=pypi&logoColor=white)](https://pypi.org/project/spacy-layout/)
+[![Test](https://github.com/explosion/spacy-layout-azure/actions/workflows/test.yml/badge.svg)](https://github.com/explosion/spacy-layout-azure/actions/workflows/test.yml)
+[![Current Release Version](https://img.shields.io/github/release/explosion/spacy-layout-azure.svg?style=flat-square&logo=github&include_prereleases)](https://github.com/explosion/spacy-layout-azure/releases)
+[![pypi Version](https://img.shields.io/pypi/v/spacy-layout-azure.svg?style=flat-square&logo=pypi&logoColor=white)](https://pypi.org/project/spacy-layout-azure/)
 [![Built with spaCy](https://img.shields.io/badge/built%20with-spaCy-09a3d5.svg?style=flat-square)](https://spacy.io)
 
 ## 📝 Usage
@@ -19,7 +16,7 @@ This workflow makes it easy to apply powerful **NLP techniques** to your documen
 > ⚠️ This package requires **Python 3.10** or above.
 
 ```bash
-pip install spacy-layout
+pip install spacy-layout-azure
 ```
 
 After initializing the `spaCyLayout` preprocessor with an `nlp` object for tokenization, you can call it on a document path to convert it to structured data. The resulting `Doc` object includes layout spans that map into the original raw text and expose various attributes, including the content type and layout features.
@@ -74,6 +71,42 @@ layout = spaCyLayout(nlp)
 doc = layout("./starcraft.pdf")
 # Apply the pipeline to access POS tags, dependencies, entities etc.
 doc = nlp(doc)
+```
+
+### Setting up Azure credentials
+
+To use spaCy Layout Azure, you need to provide your Azure Document Intelligence credentials. There are several ways to do this:
+
+```python
+import os
+import spacy
+from spacy_layout import spaCyLayout
+
+# Option 1: Set Azure credentials in environment variables
+os.environ["AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"] = "your-endpoint"
+os.environ["AZURE_DOCUMENT_INTELLIGENCE_KEY"] = "your-key"
+
+nlp = spacy.blank("en")
+layout = spaCyLayout(nlp)
+
+# Option 2: Use a .env file (recommended)
+# Create a .env file with your credentials:
+# AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your-endpoint
+# AZURE_DOCUMENT_INTELLIGENCE_KEY=your-key
+layout = spaCyLayout(nlp)
+
+# Option 3: Specify a custom .env file path:
+layout = spaCyLayout(nlp, dotenv_path="/path/to/your/.env")
+
+# Option 4: Pass credentials directly:
+layout = spaCyLayout(
+    nlp,
+    azure_endpoint="https://your-resource.cognitiveservices.azure.com/",
+    azure_key="your-api-key"
+)
+
+# Process documents as usual
+doc = layout("./document.pdf")
 ```
 
 ### Tables and tabular data
@@ -186,7 +219,8 @@ layout = spaCyLayout(nlp)
 | `attrs` | `dict[str, str]` | Override the custom spaCy attributes. Can include `"doc_layout"`, `"doc_pages"`, `"doc_tables"`, `"doc_markdown"`, `"span_layout"`, `"span_data"`, `"span_heading"` and `"span_group"`. |
 | `headings` | `list[str]` | Labels of headings to consider for `Span._.heading` detection. Defaults to `["section_header", "page_header", "title"]`. |
 | `display_table` | `Callable[[pandas.DataFrame], str] \| str` | Function to generate the text-based representation of the table in the `Doc.text` or placeholder text. Defaults to `"TABLE"`. |
-| `docling_options` | `dict[InputFormat, FormatOption]` | [Format options](https://ds4sd.github.io/docling/usage/#advanced-options) passed to Docling's `DocumentConverter`. |
+| `backend` | `str` | The backend to use for document processing. Either `"docling"` or `"azure"`. Defaults to `"docling"`. |
+| `backend_options` | `dict` | Options for the backend processor. For Docling, can include `"format_options"`. For Azure, can include `"endpoint"`, `"key"`, and `"dotenv_path"` for loading credentials from a .env file. |
 | **RETURNS** | `spaCyLayout` | The initialized object. |
 
 #### <kbd>method</kbd> `spaCyLayout.__call__`

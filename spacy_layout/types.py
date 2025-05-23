@@ -1,14 +1,5 @@
 from dataclasses import dataclass
 
-from docling_core.types.doc.document import (
-    ListItem,
-    SectionHeaderItem,
-    TableItem,
-    TextItem,
-)
-
-DoclingItem = ListItem | SectionHeaderItem | TextItem | TableItem
-
 
 @dataclass
 class Attrs:

@@ -1,3 +1,3 @@
-from .layout import spaCyLayout
+from .layout import spaCyLayoutAzure
 
-__all__ = ["spaCyLayout"]
+__all__ = ["spaCyLayoutAzure"]

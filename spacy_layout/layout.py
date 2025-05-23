@@ -1,4 +1,4 @@
-from io import BytesIO
+import os
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -7,23 +7,31 @@ from typing import (
     Iterator,
     Literal,
     TypeVar,
+    Union,
     cast,
     overload,
 )
 
 import srsly
-from docling.datamodel.base_models import DocumentStream
-from docling.document_converter import DocumentConverter
-from docling_core.types.doc.document import DoclingDocument
-from docling_core.types.doc.labels import DocItemLabel
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.core.credentials import AzureKeyCredential
+from pandas import DataFrame
 from spacy.tokens import Doc, Span, SpanGroup
 
-from .types import Attrs, DocLayout, DoclingItem, PageLayout, SpanLayout
-from .util import decode_df, decode_obj, encode_df, encode_obj, get_bounding_box
+from .types import Attrs, DocLayout, PageLayout, SpanLayout
+from .util import decode_df, decode_obj, encode_df, encode_obj
+
+# Import python-dotenv for environment variable management (optional)
+try:
+    from dotenv import load_dotenv
+
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
+
+PDF_POINTS_PER_INCH = 72
 
 if TYPE_CHECKING:
-    from docling.datamodel.base_models import InputFormat
-    from docling.document_converter import FormatOption
     from pandas import DataFrame
     from spacy.language import Language
 
@@ -31,7 +39,7 @@ if TYPE_CHECKING:
 _AnyContext = TypeVar("_AnyContext")
 
 TABLE_PLACEHOLDER = "TABLE"
-TABLE_ITEM_LABELS = [DocItemLabel.TABLE, DocItemLabel.DOCUMENT_INDEX]
+TABLE_ITEM_LABELS = ["table", "document_index"]
 
 # Register msgpack encoders and decoders for custom types
 srsly.msgpack_encoders.register("spacy-layout.dataclass", func=encode_obj)
@@ -40,21 +48,23 @@ srsly.msgpack_encoders.register("spacy-layout.dataframe", func=encode_df)
 srsly.msgpack_decoders.register("spacy-layout.dataframe", func=decode_df)
 
 
-class spaCyLayout:
+class spaCyLayoutAzure:
     def __init__(
         self,
         nlp: "Language",
         separator: str | None = "\n\n",
         attrs: dict[str, str] = {},
         headings: list[str] = [
-            DocItemLabel.SECTION_HEADER,
-            DocItemLabel.PAGE_HEADER,
-            DocItemLabel.TITLE,
+            "section_header",
+            "page_header",
+            "title",
         ],
         display_table: Callable[["DataFrame"], str] | str = TABLE_PLACEHOLDER,
-        docling_options: dict["InputFormat", "FormatOption"] | None = None,
+        azure_endpoint: str = None,
+        azure_key: str = None,
+        dotenv_path: str = None,
     ) -> None:
-        """Initialize the layout parser and Docling converter."""
+        """Initialize the layout parser and backend adapter."""
         self.nlp = nlp
         self.sep = separator
         self.attrs = Attrs(
@@ -69,7 +79,10 @@ class spaCyLayout:
         )
         self.headings = headings
         self.display_table = display_table
-        self.converter = DocumentConverter(format_options=docling_options)
+
+        # Initialize Azure Document Intelligence client
+        self._init_azure_client(azure_endpoint, azure_key, dotenv_path)
+
         # Set spaCy extension attributes for custom data
         Doc.set_extension(self.attrs.doc_layout, default=None, force=True)
         Doc.set_extension(self.attrs.doc_pages, getter=self.get_pages, force=True)
@@ -79,13 +92,10 @@ class spaCyLayout:
         Span.set_extension(self.attrs.span_data, default=None, force=True)
         Span.set_extension(self.attrs.span_heading, getter=self.get_heading, force=True)
 
-    def __call__(self, source: str | Path | bytes | DoclingDocument) -> Doc:
+    def __call__(self, source: Union[str, Path, bytes]) -> Doc:
         """Call parser on a path to create a spaCy Doc object."""
-        if isinstance(source, DoclingDocument):
-            result = source
-        else:
-            result = self.converter.convert(self._get_source(source)).document
-        return self._result_to_doc(result)
+        # Convert the document using Azure
+        return self._convert_with_azure(source)
 
     @overload
     def pipe(
@@ -112,125 +122,356 @@ class spaCyLayout:
         """Process multiple documents and create spaCy Doc objects."""
         if as_tuples:
             sources = cast(Iterable[tuple[str | Path | bytes, _AnyContext]], sources)
-            data = (self._get_source(source) for source, _ in sources)
-            contexts = (context for _, context in sources)
-            results = self.converter.convert_all(data)
-            for result, context in zip(results, contexts):
-                yield (self._result_to_doc(result.document), context)
+            for source, context in sources:
+                doc = self._convert_with_azure(source)
+                yield (doc, context)
         else:
             sources = cast(Iterable[str | Path | bytes], sources)
-            data = (self._get_source(source) for source in sources)
-            results = self.converter.convert_all(data)
-            for result in results:
-                yield self._result_to_doc(result.document)
-
-    def _get_source(self, source: str | Path | bytes) -> str | Path | DocumentStream:
-        if isinstance(source, (str, Path)):
-            return source
-        return DocumentStream(name="source", stream=BytesIO(source))
-
-    def _result_to_doc(self, document: DoclingDocument) -> Doc:
-        inputs = []
-        pages = {
-            (page.page_no): PageLayout(
-                page_no=page.page_no,
-                width=page.size.width if page.size else 0,
-                height=page.size.height if page.size else 0,
-            )
-            for _, page in document.pages.items()
-        }
-        text_items = {item.self_ref: item for item in document.texts}
-        table_items = {item.self_ref: item for item in document.tables}
-        # We want to iterate over the tree to get different elements in order
-        for node, _ in document.iterate_items():
-            if node.self_ref in text_items:
-                item = text_items[node.self_ref]
-                if item.text == "":
-                    continue
-                inputs.append((item.text, item))
-            elif node.self_ref in table_items:
-                item = table_items[node.self_ref]
-                if isinstance(self.display_table, str):
-                    table_text = self.display_table
-                else:
-                    table_text = self.display_table(item.export_to_dataframe())
-                inputs.append((table_text, item))
-        doc = self._texts_to_doc(inputs, pages)
-        doc._.set(self.attrs.doc_layout, DocLayout(pages=[p for p in pages.values()]))
-        doc._.set(self.attrs.doc_markdown, document.export_to_markdown())
-        return doc
-
-    def _texts_to_doc(
-        self, inputs: list[tuple[str, DoclingItem]], pages: dict[int, PageLayout]
-    ) -> Doc:
-        """Convert Docling structure to spaCy Doc."""
-        words = []
-        spaces = []
-        span_data = []
-        token_idx = 0
-        # Tokenize the span because we can't rely on the document parsing to
-        # give us items that are not split across token boundaries
-        with self.nlp.select_pipes(disable=self.nlp.pipe_names):
-            for span_doc, item in self.nlp.pipe(inputs, as_tuples=True):
-                words += [token.text for token in span_doc]
-                spaces += [bool(token.whitespace_) for token in span_doc]
-                # Add separator token and don't include it in the layout span
-                if self.sep:
-                    words.append(self.sep)
-                    spaces[-1] = False
-                    spaces.append(False)
-                end = token_idx + len(span_doc)
-                span_data.append((item, token_idx, end))
-                token_idx += len(span_doc) + (1 if self.sep else 0)
-        doc = Doc(self.nlp.vocab, words=words, spaces=spaces)
-        spans = []
-        for i, (item, start, end) in enumerate(span_data):
-            span = Span(doc, start=start, end=end, label=item.label, span_id=i)
-            layout = self._get_span_layout(item, pages)
-            span._.set(self.attrs.span_layout, layout)
-            if item.label in TABLE_ITEM_LABELS:
-                span._.set(self.attrs.span_data, item.export_to_dataframe())
-            spans.append(span)
-        doc.spans[self.attrs.span_group] = SpanGroup(
-            doc, name=self.attrs.span_group, spans=spans
-        )
-        return doc
-
-    def _get_span_layout(
-        self, item: DoclingItem, pages: dict[int, PageLayout]
-    ) -> SpanLayout | None:
-        if item.prov:
-            prov = item.prov[0]
-            page = pages[prov.page_no]
-            if page.width and page.height:
-                x, y, width, height = get_bounding_box(prov.bbox, page.height)
-                return SpanLayout(
-                    x=x, y=y, width=width, height=height, page_no=prov.page_no
-                )
+            for source in sources:
+                doc = self._convert_with_azure(source)
+                yield doc
 
     def get_pages(self, doc: Doc) -> list[tuple[PageLayout, list[Span]]]:
-        """Get all pages and their layout spans."""
-        layout = doc._.get(self.attrs.doc_layout)
-        pages = {page.page_no: page for page in layout.pages}
-        page_spans = {page.page_no: [] for page in layout.pages}
-        for span in doc.spans[self.attrs.span_group]:
-            span_layout = span._.get(self.attrs.span_layout)
-            page_spans[span_layout.page_no].append(span)
-        return [(pages[i], page_spans[i]) for i in page_spans]
+        """Get pages and their spans."""
+        pages = []
 
-    def get_heading(self, span: Span) -> Span | None:
-        """Get the closest heading for a span."""
-        spans = list(span.doc.spans[self.attrs.span_group])
-        if span.label_ not in self.headings:
-            # Go through previous layout spans in reverse and find first match
-            for candidate in spans[: span.id][::-1]:
-                if candidate.label_ in self.headings:
-                    return candidate
+        # Get doc layout if available
+        layout = getattr(doc._, self.attrs.doc_layout, None)
+        if not layout:
+            return []
+
+        # Get spans
+        spans = doc.spans.get(self.attrs.span_group, [])
+
+        # Group spans by page
+        for page in layout.pages:
+            page_spans = []
+            for span in spans:
+                span_layout = getattr(span._, self.attrs.span_layout, None)
+                if span_layout and span_layout.page_no == page.page_no:
+                    page_spans.append(span)
+            pages.append((page, page_spans))
+
+        return pages
 
     def get_tables(self, doc: Doc) -> list[Span]:
-        """Get all tables in the document."""
-        return [
-            span
-            for span in doc.spans[self.attrs.span_group]
-            if span.label_ in TABLE_ITEM_LABELS
-        ]
+        """Get all table spans from the document."""
+        tables = []
+
+        # Get spans
+        spans = doc.spans.get(self.attrs.span_group, [])
+
+        # Filter for table spans
+        for span in spans:
+            if span.label_ in TABLE_ITEM_LABELS:
+                tables.append(span)
+
+        return tables
+
+    def get_heading(self, span: Span) -> Span | None:
+        """
+        Get the closest heading to a span.
+
+        This is a getter method for Span._.heading extension
+        and attempts to find the closest section title or header
+        that this span belongs to.
+        """
+        doc = span.doc
+
+        # Get layout spans
+        spans = doc.spans.get(self.attrs.span_group, [])
+        if not spans:
+            return None
+
+        # Get heading spans
+        heading_spans = [s for s in spans if s.label_ in self.headings]
+        if not heading_spans:
+            return None
+
+        # Get layout for current span
+        layout = getattr(span._, self.attrs.span_layout, None)
+        if not layout:
+            return None
+
+        # Find closest preceding heading on the same page
+        closest_heading = None
+        for heading in heading_spans:
+            heading_layout = getattr(heading._, self.attrs.span_layout, None)
+            if not heading_layout:
+                continue
+
+            # Heading must be on same page and before current span
+            if heading_layout.page_no == layout.page_no and (
+                (heading_layout.y < layout.y)
+                or (heading_layout.y == layout.y and heading_layout.x <= layout.x)
+            ):
+                if closest_heading is None:
+                    closest_heading = heading
+                else:
+                    closest_layout = getattr(
+                        closest_heading._, self.attrs.span_layout, None
+                    )
+                    if closest_layout and heading_layout.y > closest_layout.y:
+                        closest_heading = heading
+
+        return closest_heading
+
+    def _init_azure_client(
+        self, endpoint: str = None, key: str = None, dotenv_path: str = None
+    ):
+        """Initialize Azure Document Intelligence client."""
+        # Load environment variables from .env file if available
+        if DOTENV_AVAILABLE and dotenv_path is not None:
+            load_dotenv(dotenv_path)
+        elif DOTENV_AVAILABLE and endpoint is None and key is None:
+            load_dotenv()  # Try to load from default locations only if no explicit values
+
+        self.endpoint = (
+            endpoint
+            if endpoint is not None
+            else os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+        )
+        self.key = (
+            key
+            if key is not None
+            else os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+        )
+
+        if not self.endpoint or not self.key:
+            raise ValueError(
+                "Azure Document Intelligence endpoint and key must be provided or "
+                "set as environment variables (AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT, "
+                "AZURE_DOCUMENT_INTELLIGENCE_KEY) or in a .env file"
+            )
+
+        self.client = DocumentIntelligenceClient(
+            endpoint=self.endpoint, credential=AzureKeyCredential(self.key)
+        )
+
+    def _convert_with_azure(self, source: Union[str, Path, bytes]) -> Doc:
+        """Convert a document using Azure Document Intelligence directly to spaCy Doc."""
+        # Handle different source types
+        if isinstance(source, (str, Path)):
+            str(source)
+            with open(source, "rb") as f:
+                content = f.read()
+        else:
+            content = source
+
+        # Process with Azure
+        poller = self.client.begin_analyze_document("prebuilt-layout", content)
+        result = poller.result()
+
+        # Convert directly to spaCy Doc
+        return self._azure_to_doc(result)
+
+    def _polygon_to_span_layout(
+        self,
+        polygon: list[float],
+        page_no: int,
+        page_height: float,
+        scale_factor: float = PDF_POINTS_PER_INCH,
+    ) -> SpanLayout:
+        """Create a SpanLayout from an Azure polygon."""
+        x_values = polygon[::2]
+        y_values = polygon[1::2]
+
+        # Scale coordinates from inches to points
+        x = min(x_values) * scale_factor
+        y = min(y_values) * scale_factor
+        width = (max(x_values) - min(x_values)) * scale_factor
+        height = (max(y_values) - min(y_values)) * scale_factor
+
+        return SpanLayout(
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            page_no=page_no,
+        )
+
+    def _azure_to_doc(self, result) -> Doc:
+        """Convert Azure Document Intelligence result directly to spaCy Doc."""
+        # Collect page information
+        pages = {}
+        page_heights = {}
+        for page in result.pages:
+            page_no = page.page_number
+            # Azure may return None for dimensions in some formats like DOCX
+            width = (
+                page.width * PDF_POINTS_PER_INCH
+                if page.width
+                else 8.5 * PDF_POINTS_PER_INCH
+            )  # Default to letter size
+            height = (
+                page.height * PDF_POINTS_PER_INCH
+                if page.height
+                else 11 * PDF_POINTS_PER_INCH
+            )
+            pages[page_no] = PageLayout(
+                page_no=page_no,
+                width=width,
+                height=height,
+            )
+            page_heights[page_no] = height
+
+        # Process all content in reading order
+        texts = []
+        spans_info = []
+
+        # Combine paragraphs and tables in the order they appear
+        all_items = []
+
+        # Add paragraphs
+        for idx, paragraph in enumerate(result.paragraphs):
+            all_items.append(("paragraph", idx, paragraph))
+
+        # Add tables
+        for idx, table in enumerate(result.tables):
+            all_items.append(("table", idx, table))
+
+        # Sort by position (using first bounding region if available)
+        def get_position(item):
+            _, _, content = item
+            if hasattr(content, "bounding_regions") and content.bounding_regions:
+                region = content.bounding_regions[0]
+                return (region.page_number, region.polygon[1] if region.polygon else 0)
+            return (1, 0)
+
+        all_items.sort(key=get_position)
+
+        # Process items in order
+        for item_type, idx, content in all_items:
+            if item_type == "paragraph":
+                # Add text
+                text = content.content
+                if not text:
+                    continue
+
+                # Add separator if needed
+                if texts and self.sep is not None:
+                    texts.append(self.sep)
+
+                texts.append(text)
+
+                # Get layout information
+                layout = None
+                if content.bounding_regions:
+                    region = content.bounding_regions[0]
+                    page_no = region.page_number
+                    if region.polygon and page_no in page_heights:
+                        layout = self._polygon_to_span_layout(
+                            region.polygon, page_no, page_heights[page_no]
+                        )
+
+                # Store span info
+                spans_info.append(
+                    {"text": text, "label": "text", "layout": layout, "data": None}
+                )
+
+            elif item_type == "table":
+                # Convert table to DataFrame
+                rows = content.row_count
+                cols = content.column_count
+                values = [[None for _ in range(cols)] for _ in range(rows)]
+
+                # Fill cells with data
+                for cell in content.cells:
+                    values[cell.row_index][cell.column_index] = cell.content
+
+                # Create DataFrame
+                df = DataFrame(values)
+
+                # Ensure columns are strings for display
+                if not df.empty and len(df.columns) > 0:
+                    df.columns = [str(col) for col in df.columns]
+
+                # Generate table text
+                if callable(self.display_table) and not df.empty:
+                    text = self.display_table(df)
+                elif isinstance(self.display_table, str):
+                    text = self.display_table
+                else:
+                    text = TABLE_PLACEHOLDER
+
+                # Add separator if needed
+                if texts and self.sep is not None:
+                    texts.append(self.sep)
+
+                texts.append(text)
+
+                # Get layout information
+                layout = None
+                if content.bounding_regions:
+                    region = content.bounding_regions[0]
+                    page_no = region.page_number
+                    if region.polygon and page_no in page_heights:
+                        layout = self._polygon_to_span_layout(
+                            region.polygon, page_no, page_heights[page_no]
+                        )
+
+                # Store span info
+                spans_info.append(
+                    {
+                        "text": text,
+                        "label": "table",
+                        "layout": layout,
+                        "data": df if not df.empty else None,
+                    }
+                )
+
+        # Create the spaCy Doc
+        full_text = "".join(texts)
+        doc = self.nlp.make_doc(full_text)
+
+        # Create span group
+        span_group = SpanGroup(doc, name=self.attrs.span_group)
+
+        # Track character positions
+        char_offset = 0
+        span_idx = 0
+
+        # Create spans
+        for i, text in enumerate(texts):
+            # Skip separators
+            if self.sep is not None and text == self.sep:
+                char_offset += len(text)
+                continue
+
+            # Get span info
+            if span_idx < len(spans_info):
+                info = spans_info[span_idx]
+                span_idx += 1
+
+                # Find token boundaries
+                start_token = None
+                end_token = None
+                for token in doc:
+                    if start_token is None and token.idx >= char_offset:
+                        start_token = token.i
+                    if token.idx + len(token.text) <= char_offset + len(text):
+                        end_token = token.i + 1
+
+                if start_token is not None and end_token is not None:
+                    span = doc[start_token:end_token]
+                    span.label = self.nlp.vocab.strings.add(info["label"])
+                    span_group.append(span)
+
+                    # Set layout
+                    if info["layout"]:
+                        span._.set(self.attrs.span_layout, info["layout"])
+
+                    # Set data for tables
+                    if info["data"] is not None:
+                        span._.set(self.attrs.span_data, info["data"])
+
+            char_offset += len(text)
+
+        # Add spans to doc
+        doc.spans[self.attrs.span_group] = span_group
+
+        # Set document layout
+        doc_pages = [pages[p] for p in sorted(pages.keys())]
+        doc._.set(self.attrs.doc_layout, DocLayout(pages=doc_pages))
+
+        return doc

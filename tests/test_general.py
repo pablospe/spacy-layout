@@ -29,7 +29,17 @@ def nlp():
 @pytest.fixture
 def span_labels():
     # Define the expected labels directly
-    return ["text", "section_header", "page_header", "title", "table", "list_item", "document_index", "footnote", "formula"]
+    return [
+        "text",
+        "section_header",
+        "page_header",
+        "title",
+        "table",
+        "list_item",
+        "document_index",
+        "footnote",
+        "formula",
+    ]
 
 
 @pytest.mark.parametrize("path", [PDF_STARCRAFT, PDF_SIMPLE, PDF_SIMPLE_BYTES])
@@ -67,9 +77,13 @@ def test_simple(path, separator, nlp):
     assert doc.text.startswith(f"Lorem ipsum dolor sit amet{separator}")
     # With no separator, token boundaries might not align perfectly
     if separator == "":
-        assert doc.spans[layout.attrs.span_group][0].text.startswith("Lorem ipsum dolor sit")
+        assert doc.spans[layout.attrs.span_group][0].text.startswith(
+            "Lorem ipsum dolor sit"
+        )
     else:
-        assert doc.spans[layout.attrs.span_group][0].text == "Lorem ipsum dolor sit amet"
+        assert (
+            doc.spans[layout.attrs.span_group][0].text == "Lorem ipsum dolor sit amet"
+        )
 
 
 def test_simple_pipe(nlp):
@@ -117,7 +131,7 @@ def test_table_index(nlp):
     assert table.text == TABLE_PLACEHOLDER
     # Azure doesn't distinguish document_index tables
     assert table.label_ == "table"
-    
+
     # Check that the table has data
     assert table._.data is not None, "Table data not available"
     assert isinstance(table._.data, pd.DataFrame), "Table data is not a DataFrame"

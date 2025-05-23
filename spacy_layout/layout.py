@@ -298,8 +298,16 @@ class spaCyLayoutAzure:
         for page in result.pages:
             page_no = page.page_number
             # Azure may return None for dimensions in some formats like DOCX
-            width = page.width * PDF_POINTS_PER_INCH if page.width else 8.5 * PDF_POINTS_PER_INCH  # Default to letter size
-            height = page.height * PDF_POINTS_PER_INCH if page.height else 11 * PDF_POINTS_PER_INCH
+            width = (
+                page.width * PDF_POINTS_PER_INCH
+                if page.width
+                else 8.5 * PDF_POINTS_PER_INCH
+            )  # Default to letter size
+            height = (
+                page.height * PDF_POINTS_PER_INCH
+                if page.height
+                else 11 * PDF_POINTS_PER_INCH
+            )
             pages[page_no] = PageLayout(
                 page_no=page_no,
                 width=width,
@@ -373,7 +381,7 @@ class spaCyLayoutAzure:
 
                 # Create DataFrame
                 df = DataFrame(values)
-                
+
                 # Ensure columns are strings for display
                 if not df.empty and len(df.columns) > 0:
                     df.columns = [str(col) for col in df.columns]
